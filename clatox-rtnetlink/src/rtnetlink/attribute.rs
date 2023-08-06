@@ -16,6 +16,7 @@ pub(crate) fn align_attribute_len(len: i32) -> i32 {
 /// TODO: The enum is complete, but some values are still untyped.
 #[doc(alias("ifinfomsg", "ifi_type", "IFLA_"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum InterfaceInfoAttribute {
     /// `IFLA_UNSPEC`
     Unspecified(Vec<u8>),
