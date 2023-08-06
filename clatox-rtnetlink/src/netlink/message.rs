@@ -166,12 +166,12 @@ impl<T: Payload> Message<T> {
         let mut iter = bytes.iter();
         let header_only = std::mem::size_of::<T>() == 0;
 
-        let length = read_u32(iter.by_ref().take(4).cloned()).unwrap();
-        let message_type = read_u16(iter.by_ref().take(2).cloned()).unwrap();
+        let length = read_u32(iter.by_ref().cloned()).unwrap();
+        let message_type = read_u16(iter.by_ref().cloned()).unwrap();
 
-        let flags = read_u16(iter.by_ref().take(2).cloned()).unwrap();
-        let seq = read_u32(iter.by_ref().take(4).cloned()).unwrap();
-        let pid = read_u32(iter.by_ref().take(4).cloned()).unwrap();
+        let flags = read_u16(iter.by_ref().cloned()).unwrap();
+        let seq = read_u32(iter.by_ref().cloned()).unwrap();
+        let pid = read_u32(iter.by_ref().cloned()).unwrap();
 
         let message_type = Type::from_raw_value(message_type)?;
         let flags = unsafe { Flags::with_bits(flags) };

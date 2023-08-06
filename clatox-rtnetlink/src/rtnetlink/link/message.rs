@@ -78,11 +78,11 @@ impl InterfaceInfoMessage {
 
         let mut iter = bytes.iter();
 
-        let family = read_u16(iter.by_ref().take(2).cloned()).unwrap() & 0xFF;
-        let device_type = read_u16(iter.by_ref().take(2).cloned()).unwrap();
-        let index = read_u32(iter.by_ref().take(4).cloned()).unwrap() as i32;
-        let flags = read_u32(iter.by_ref().take(4).cloned()).unwrap();
-        let change = read_u32(iter.by_ref().take(4).cloned()).unwrap();
+        let family = read_u16(iter.by_ref().cloned()).unwrap() & 0xFF;
+        let device_type = read_u16(iter.by_ref().cloned()).unwrap();
+        let index = read_u32(iter.by_ref().cloned()).unwrap() as i32;
+        let flags = read_u32(iter.by_ref().cloned()).unwrap();
+        let change = read_u32(iter.by_ref().cloned()).unwrap();
 
         let device_type = ArpHardware::from_raw_value(device_type)?;
         let flags = unsafe { InterfaceFlags::with_bits(flags) };
