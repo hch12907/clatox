@@ -2,16 +2,13 @@ use libc::*;
 
 use std::mem::{size_of, transmute};
 
-use crate::utils::read_u16;
+use crate::utils::{align_attribute_len, read_u16};
 
+use super::LinkInfo;
 use super::stats::{InterfaceStats, InterfaceStats64};
 
-pub(crate) fn align_attribute_len(len: i32) -> i32 {
-    // TODO: we shouldn't use NLA_ALIGNTO here.
-    (len + NLA_ALIGNTO - 1) & !(NLA_ALIGNTO - 1)
-}
-
-/// Those attributes are to be used with `InterfaceInfoMessage`s.
+/// Those attributes are to be used with `InterfaceInfoMessage`s. They
+/// correspond to `IFLA_*` in libc.
 ///
 /// TODO: The enum is complete, but some values are still untyped.
 #[doc(alias("ifinfomsg", "ifi_type", "IFLA_"))]
@@ -73,7 +70,7 @@ pub enum InterfaceInfoAttribute {
     LinkMode(u8),
 
     /// `IFLA_LINKINFO`
-    LinkInfo(Vec<u8>),
+    LinkInfo(Vec<LinkInfo>),
 
     /// `IFLA_NET_NS_PID`
     NetNamespacePid(Vec<u8>),
@@ -318,9 +315,11 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.to_ne_bytes().into_iter())
             }
 
-            InterfaceInfoAttribute::LinkInfo(content) => {
+            InterfaceInfoAttribute::LinkInfo(infos) => {
                 attr_type = IFLA_LINKINFO;
-                buffer.extend(content.iter().cloned())
+                for info in infos {
+                    info.serialize_in(buffer);
+                }
             }
 
             InterfaceInfoAttribute::NetNamespacePid(content) => {
@@ -577,8 +576,8 @@ impl InterfaceInfoAttribute {
     pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
         let mut iter = bytes.iter();
 
-        let attr_len = read_u16(iter.by_ref().take(2).cloned()).unwrap();
-        let attr_type = read_u16(iter.by_ref().take(2).cloned()).unwrap();
+        let attr_len = read_u16(iter.by_ref().cloned()).unwrap();
+        let attr_type = read_u16(iter.by_ref().cloned()).unwrap();
         let aligned_attr_len = align_attribute_len(attr_len as i32) as usize;
         let mut content = iter
             .by_ref()
@@ -646,7 +645,20 @@ impl InterfaceInfoAttribute {
                 let content = content.get(0)?;
                 InterfaceInfoAttribute::LinkMode(*content)
             }
-            IFLA_LINKINFO => InterfaceInfoAttribute::LinkInfo(content),
+            IFLA_LINKINFO => {
+                let mut iter = content.iter();
+                let mut remaining_len = content.len();
+                let mut infos = Vec::new();
+
+                while remaining_len > 0 {
+                    let (attr, len) = LinkInfo::deserialize(iter.as_slice())?;
+                    infos.push(attr);
+                    iter.nth(len - 1).unwrap();
+                    remaining_len -= len;
+                }
+
+                InterfaceInfoAttribute::LinkInfo(infos)
+            },
             IFLA_NET_NS_PID => InterfaceInfoAttribute::NetNamespacePid(content),
             IFLA_IFALIAS => InterfaceInfoAttribute::InterfaceAlias(content),
             IFLA_NUM_VF => {

@@ -1,6 +1,7 @@
 mod attribute;
 mod device_type;
 mod flags;
+mod link_info;
 mod message;
 mod stats;
 
@@ -12,6 +13,9 @@ pub use device_type::*;
 
 #[doc(inline)]
 pub use flags::*;
+
+#[doc(inline)]
+pub use link_info::*;
 
 #[doc(inline)]
 pub use message::*;

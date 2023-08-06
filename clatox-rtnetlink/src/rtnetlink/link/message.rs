@@ -1,8 +1,7 @@
 use libc::*;
 
-use super::align_attribute_len;
 use crate::netlink::{Payload, RouteType, Type};
-use crate::utils::{read_u16, read_u32};
+use crate::utils::{align_attribute_len, read_u16, read_u32};
 
 use super::{ArpHardware, InterfaceFlags, InterfaceInfoAttribute};
 
