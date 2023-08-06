@@ -5,12 +5,12 @@ use super::{Flags, Type};
 pub type Header = Message<()>;
 
 /// This struct corresponds to `nlmsghdr` in libc, along with the payload.
-/// 
+///
 /// To calculate the length of a Message, use `serialize()` and measure the
 /// length of the resulting byte array. If you are sure that the Message
 /// contains only normal, plain-old-data structs (which is not the case for
 /// e.g. Route messsages), you can measure the length using `mem::size_of()`.
-/// 
+///
 /// If you need to obtain the length as specified in the header, deserialize
 /// your message into a `Message<()>` and call `length()` on it.
 #[repr(C)]
@@ -33,6 +33,62 @@ pub trait Payload: Sized {
     fn deserialize(bytes: &[u8]) -> Option<Self>;
 }
 
+/// A Netlink error message.
+///
+///  
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorMessage {
+    error_code: i32,
+    original_header: Header,
+}
+
+impl ErrorMessage {
+    pub fn new(error_code: i32, original_header: Header) -> Self {
+        Self {
+            error_code,
+            original_header,
+        }
+    }
+
+    pub fn error_code(&self) -> i32 {
+        self.error_code
+    }
+
+    pub fn original_header(&self) -> &Header {
+        &self.original_header
+    }
+}
+
+impl Payload for ErrorMessage {
+    fn message_type() -> Type {
+        Type::Error
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut buf = Vec::with_capacity(24);
+        buf.extend(self.error_code.to_ne_bytes().into_iter());
+        buf.extend(self.original_header.serialize().into_iter());
+        buf.into_boxed_slice()
+    }
+
+    fn deserialize(bytes: &[u8]) -> Option<Self> {
+        let mut bytes = bytes.iter();
+
+        let error_code = i32::from_ne_bytes([
+            *bytes.next()?,
+            *bytes.next()?,
+            *bytes.next()?,
+            *bytes.next()?,
+        ]);
+        let original_header = Message::<()>::deserialize(bytes.as_slice())?;
+
+        Some(Self {
+            error_code,
+            original_header,
+        })
+    }
+}
+
 impl Payload for () {
     fn message_type() -> Type {
         Type::Noop
@@ -47,24 +103,10 @@ impl Payload for () {
     }
 }
 
-impl Payload for Message<()> {
-    fn message_type() -> Type {
-        Type::Error
-    }
-
-    fn serialize(&self) -> Box<[u8]> {
-        self.serialize()
-    }
-
-    fn deserialize(bytes: &[u8]) -> Option<Self> {
-        Self::deserialize(bytes)
-    }
-} 
-
 impl Message<()> {
     /// Gets the length as specified in the header of a message.
     ///
-    /// **NOTE:** This will only work for received messages! 
+    /// **NOTE:** This will only work for received messages!
     pub fn length(&self) -> u32 {
         self.length
     }
@@ -136,7 +178,7 @@ impl<T: Payload> Message<T> {
 
         // The `()` "payload" means that we get only the headers.
         if !header_only && message_type != T::message_type() {
-            return None
+            return None;
         }
 
         let the_rest = iter.as_slice();

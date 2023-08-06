@@ -4,7 +4,7 @@ use socket2::{Domain, Protocol as RawProtocol, SockAddr, Socket as RawSocket, Ty
 use std::io::{ErrorKind as IoErrorKind, IoSlice, IoSliceMut, Read, Result as IoResult, Write};
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
-use super::{Message, Payload, Protocol, Flag, types, Header};
+use super::{Message, Payload, Protocol, Flag, types, ErrorMessage};
 
 /// This corresponds to an opened socket which is bound to a `SocketAddr`.
 /// Right now, `SocketAddr` is not implemented and `Socket` is hardcoded to
@@ -19,7 +19,7 @@ pub struct Socket {
 pub enum ReceivedMessage<T> {
     /// A Netlink error message was received. The original Netlink header is
     /// provided to give user applications a clue which message was erroneous.
-    Error(Message<Header>),
+    Error(Message<ErrorMessage>),
 
     /// A Netlink message was successfully received.
     Message(Message<T>),
@@ -141,7 +141,7 @@ impl Socket {
 
             Ok(ReceivedMessage::Multipart(messages))
         } else if is_error {
-            match Message::<Header>::deserialize(&buffer[..size]) {
+            match Message::<ErrorMessage>::deserialize(&buffer[..size]) {
                 Some(msg) => Ok(ReceivedMessage::Error(msg)),
                 None => Err(IoErrorKind::InvalidInput)?,
             }
@@ -151,42 +151,6 @@ impl Socket {
                 None => Err(IoErrorKind::InvalidInput)?,
             }
         }
-
-        // loop {
-        //     let size = self.socket.read(buffer.as_mut_slice())?;
-
-        //     let header = match Message::<()>::deserialize(&buffer[..size]) {
-        //         Some(header) => header,
-        //         None => Err(IoErrorKind::InvalidInput)?,
-        //     };
-
-        //     if is_multipart && header.message_type() == types::Type::Done {
-        //         break Ok(ReceivedMessage::Multipart(messages))
-        //     }
-
-        //     else if !is_error {
-        //         println!("Ho");
-        //         let msg = match Message::<T>::deserialize(&buffer[..size]) {
-        //             Some(msg) => msg,
-        //             None => Err(IoErrorKind::InvalidData)?
-        //         };
-
-        //         if is_multipart {
-        //             messages.push(msg);
-        //         } else {
-        //             break Ok(ReceivedMessage::Message(msg))
-        //         }
-        //     }
-            
-        //     else {
-        //         let msg = match Message::<Header>::deserialize(buffer.as_ref()) {
-        //             Some(msg) => msg,
-        //             None => Err(IoErrorKind::InvalidData)?
-        //         };
-
-        //         break Ok(ReceivedMessage::Error(msg));
-        //     };
-        // }
     }
 
     pub fn send_message<T>(&mut self, msg: &Message<T>) -> IoResult<usize>
