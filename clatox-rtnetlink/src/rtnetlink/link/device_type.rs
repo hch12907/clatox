@@ -23,15 +23,15 @@ pub const ARPHRD_VSOCKMON: u16 = 826;
 ///
 /// Naming conventions
 /// ======
-/// Unlike many other enums in this library which try to establish a human-
-/// readable name for its variants, the variants in this enum are deliberately
-/// given names that are similar to their C `ARPHRD_*` counterparts, except
-/// being adapted to camel case. The reasoning is that those names are not
+/// Unlike many other enums in this library which try to establish a human-readable
+/// name for its variants, the variants in this enum are given deliberately
+/// names that are similar to their C `ARPHRD_*` counterparts, only that they
+/// are adapted to camel case. The reasoning is that those names are not
 /// semantical - they are merely names of various technologies, and changing
 /// them would actually lead to confusions.
 /// 
 /// However, a limited number of names are still modified. `ARPHRD_EETHER` and
-/// `ARPHRD_HWX25`, for example.
+/// `ARPHRD_HWX25`, for example, as parts of their names *are* semantic.
 #[doc(alias("ifinfomsg", "ifi_type", "ARPHRD_"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]

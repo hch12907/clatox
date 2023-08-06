@@ -76,7 +76,7 @@ pub enum InterfaceInfoAttribute {
     NetNamespacePid(Vec<u8>),
 
     /// `IFLA_IFALIAS`
-    InterfaceAlias(Vec<u8>),
+    InterfaceAlias(String),
 
     /// `IFLA_NUM_VF`
     NumVf(u32),
@@ -327,9 +327,10 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned())
             }
 
-            InterfaceInfoAttribute::InterfaceAlias(content) => {
+            InterfaceInfoAttribute::InterfaceAlias(alias) => {
                 attr_type = IFLA_IFALIAS;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(alias.bytes());
+                buffer.push(0u8); // zero terminated string
             }
 
             InterfaceInfoAttribute::NumVf(content) => {
@@ -660,7 +661,12 @@ impl InterfaceInfoAttribute {
                 InterfaceInfoAttribute::LinkInfo(infos)
             },
             IFLA_NET_NS_PID => InterfaceInfoAttribute::NetNamespacePid(content),
-            IFLA_IFALIAS => InterfaceInfoAttribute::InterfaceAlias(content),
+            IFLA_IFALIAS => {
+                let mut content = String::from_utf8(content).ok()?;
+                let zero = content.pop();
+                debug_assert!(zero == Some('\0'));
+                InterfaceInfoAttribute::InterfaceAlias(content)
+            },
             IFLA_NUM_VF => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::NumVf(u32::from_ne_bytes(content))

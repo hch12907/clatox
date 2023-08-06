@@ -5,6 +5,8 @@ use crate::utils::{align_attribute_len, read_u16, read_u32};
 
 use super::{ArpHardware, InterfaceFlags, InterfaceInfoAttribute};
 
+/// The message on which the `GetLink`, `AddLink`, `DeleteLink` requests are based
+/// on. It corresponds to the `ifinfomsg` struct in libc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceInfoMessage {
     family: u16, // This is an unsigned char in ifinfomsg. Use u16 to cover the padding.
@@ -119,6 +121,7 @@ impl InterfaceInfoMessage {
     }
 }
 
+/// A message that is of the `RTM_NEWLINK` type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewLink(pub InterfaceInfoMessage);
 
@@ -136,6 +139,7 @@ impl Payload for NewLink {
     }
 }
 
+/// A message that is of the `RTM_GETLINK` type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GetLink(pub InterfaceInfoMessage);
 
@@ -153,6 +157,7 @@ impl Payload for GetLink {
     }
 }
 
+/// A message that is of the `RTM_DELLINK` type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeleteLink(pub InterfaceInfoMessage);
 
