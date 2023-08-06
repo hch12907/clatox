@@ -1,6 +1,10 @@
 use libc::*;
 
+use std::mem::{size_of, transmute};
+
 use crate::utils::read_u16;
+
+use super::stats::{InterfaceStats, InterfaceStats64};
 
 pub(crate) fn align_attribute_len(len: i32) -> i32 {
     // TODO: we shouldn't use NLA_ALIGNTO here.
@@ -35,7 +39,7 @@ pub enum InterfaceInfoAttribute {
     QueueDiscipline(String),
 
     /// `IFLA_STATS` - interface statistics.
-    Stats(Vec<u8>),
+    Stats(InterfaceStats),
 
     /// `IFLA_COST`
     Cost(Vec<u8>),
@@ -50,7 +54,7 @@ pub enum InterfaceInfoAttribute {
     Wireless(Vec<u8>),
 
     /// `IFLA_PROTINFO`
-    ProtoInfo(Vec<u8>),
+    ProtocolInfo(Vec<u8>),
 
     /// `IFLA_TXQLEN`
     TxQueueLength(u32),
@@ -83,7 +87,7 @@ pub enum InterfaceInfoAttribute {
     VfInfoList(Vec<u8>),
 
     /// `IFLA_STATS64`
-    Stats64(Vec<u8>),
+    Stats64(InterfaceStats64),
 
     /// `IFLA_VF_PORTS`
     VfPorts(Vec<u8>),
@@ -131,7 +135,7 @@ pub enum InterfaceInfoAttribute {
     PhysicalPortName(Vec<u8>),
 
     /// `IFLA_PROTO_DOWN`
-    ProtoDown(Vec<u8>),
+    ProtocolDown(Vec<u8>),
 
     /// `IFLA_GSO_MAX_SEGS`
     GsoMaxSegments(u32),
@@ -182,7 +186,7 @@ pub enum InterfaceInfoAttribute {
     PermanentAddress(Vec<u8>),
 
     /// `IFLA_PROTO_DOWN_REASON`
-    ProtoDownReason(Vec<u8>),
+    ProtocolDownReason(Vec<u8>),
 
     /// `IFLA_PARENT_DEV_NAME`
     ParentDeviceName(String),
@@ -255,7 +259,12 @@ impl InterfaceInfoAttribute {
 
             InterfaceInfoAttribute::Stats(stats) => {
                 attr_type = IFLA_STATS;
-                buffer.extend(stats.iter().cloned());
+                // SAFETY: It is safe to transmute InterfaceStats into a byte array as
+                // the type does not contain any paddings.
+                let bytes = unsafe {
+                    transmute::<InterfaceStats, [u8; size_of::<InterfaceStats>()]>(stats.clone())
+                };
+                buffer.extend(bytes.iter().cloned());
             }
 
             InterfaceInfoAttribute::Cost(content) => {
@@ -278,7 +287,7 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned());
             }
 
-            InterfaceInfoAttribute::ProtoInfo(content) => {
+            InterfaceInfoAttribute::ProtocolInfo(content) => {
                 attr_type = IFLA_PROTINFO;
                 buffer.extend(content.iter().cloned());
             }
@@ -333,9 +342,16 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned())
             }
 
-            InterfaceInfoAttribute::Stats64(content) => {
+            InterfaceInfoAttribute::Stats64(stats) => {
                 attr_type = IFLA_STATS64;
-                buffer.extend(content.iter().cloned())
+                // SAFETY: It is safe to transmute InterfaceStats64 into a byte array as
+                // the type does not contain any paddings.
+                let bytes = unsafe {
+                    transmute::<InterfaceStats64, [u8; size_of::<InterfaceStats64>()]>(
+                        stats.clone(),
+                    )
+                };
+                buffer.extend(bytes.iter().cloned())
             }
 
             InterfaceInfoAttribute::VfPorts(content) => {
@@ -413,7 +429,7 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned())
             }
 
-            InterfaceInfoAttribute::ProtoDown(content) => {
+            InterfaceInfoAttribute::ProtocolDown(content) => {
                 attr_type = IFLA_PROTO_DOWN;
                 buffer.extend(content.iter().cloned())
             }
@@ -498,7 +514,7 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned())
             }
 
-            InterfaceInfoAttribute::ProtoDownReason(content) => {
+            InterfaceInfoAttribute::ProtocolDownReason(content) => {
                 attr_type = IFLA_PROTO_DOWN_REASON;
                 buffer.extend(content.iter().cloned())
             }
@@ -600,12 +616,21 @@ impl InterfaceInfoAttribute {
                 debug_assert!(zero == Some('\0'));
                 InterfaceInfoAttribute::QueueDiscipline(content)
             }
-            IFLA_STATS => InterfaceInfoAttribute::Stats(content),
+            IFLA_STATS => {
+                let content = <[u8; size_of::<InterfaceStats>()]>::try_from(content).ok()?;
+                // SAFETY: InterfaceStats is a plain-old-data struct and contains no
+                // paddings. We trust Rtnetlink to give us the correct values here, but
+                // even if the values are wrong, there won't be a memory corruption or UB.
+                let stats = unsafe {
+                    transmute::<[u8; size_of::<InterfaceStats>()], InterfaceStats>(content)
+                };
+                InterfaceInfoAttribute::Stats(stats)
+            }
             IFLA_COST => InterfaceInfoAttribute::Cost(content),
             IFLA_PRIORITY => InterfaceInfoAttribute::Priority(content),
             IFLA_MASTER => InterfaceInfoAttribute::Master(content),
             IFLA_WIRELESS => InterfaceInfoAttribute::Wireless(content),
-            IFLA_PROTINFO => InterfaceInfoAttribute::ProtoInfo(content),
+            IFLA_PROTINFO => InterfaceInfoAttribute::ProtocolInfo(content),
             IFLA_TXQLEN => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::TxQueueLength(u32::from_ne_bytes(content))
@@ -628,7 +653,16 @@ impl InterfaceInfoAttribute {
                 InterfaceInfoAttribute::NumVf(u32::from_ne_bytes(content))
             }
             IFLA_VFINFO_LIST => InterfaceInfoAttribute::VfInfoList(content),
-            IFLA_STATS64 => InterfaceInfoAttribute::Stats64(content),
+            IFLA_STATS64 => {
+                let content = <[u8; size_of::<InterfaceStats64>()]>::try_from(content).ok()?;
+                // SAFETY: InterfaceStats is a plain-old-data struct and contains no
+                // paddings. We trust Rtnetlink to give us the correct values here, but
+                // even if the values are wrong, there won't be a memory corruption or UB.
+                let stats = unsafe {
+                    transmute::<[u8; size_of::<InterfaceStats64>()], InterfaceStats64>(content)
+                };
+                InterfaceInfoAttribute::Stats64(stats)
+            }
             IFLA_VF_PORTS => Self::VfPorts(content),
             IFLA_PORT_SELF => Self::PortSelf(content),
             IFLA_AF_SPEC => Self::AddressFamilySpecific(content),
@@ -659,7 +693,7 @@ impl InterfaceInfoAttribute {
             IFLA_PHYS_SWITCH_ID => Self::PhysicalSwitchId(content),
             IFLA_LINK_NETNSID => Self::LinkNetNamespaceId(content),
             IFLA_PHYS_PORT_NAME => Self::PhysicalPortName(content),
-            IFLA_PROTO_DOWN => Self::ProtoDown(content),
+            IFLA_PROTO_DOWN => Self::ProtocolDown(content),
             IFLA_GSO_MAX_SEGS => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::GsoMaxSegments(u32::from_ne_bytes(content))
@@ -696,7 +730,7 @@ impl InterfaceInfoAttribute {
             IFLA_PROP_LIST => Self::PropertiesList(content),
             IFLA_ALT_IFNAME => Self::AlternativeName(content),
             IFLA_PERM_ADDRESS => Self::PermanentAddress(content),
-            IFLA_PROTO_DOWN_REASON => Self::ProtoDownReason(content),
+            IFLA_PROTO_DOWN_REASON => Self::ProtocolDownReason(content),
             IFLA_PARENT_DEV_NAME => {
                 let mut content = String::from_utf8(content).ok()?;
                 let zero = content.pop();

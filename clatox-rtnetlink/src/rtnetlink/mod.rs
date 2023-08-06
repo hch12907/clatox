@@ -2,6 +2,7 @@ mod attribute;
 mod device_type;
 mod flags;
 mod message;
+mod stats;
 
 #[doc(inline)]
 pub use attribute::*;

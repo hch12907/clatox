@@ -137,13 +137,29 @@ impl Payload for NewLink {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GetLink(pub InterfaceInfoMessage);
 
 impl Payload for GetLink {
     fn message_type() -> Type {
         Type::Route(RouteType::GetLink)
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.0.serialize()
+    }
+
+    fn deserialize(bytes: &[u8]) -> Option<Self> {
+        Some(Self(InterfaceInfoMessage::deserialize(bytes)?))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteLink(pub InterfaceInfoMessage);
+
+impl Payload for DeleteLink {
+    fn message_type() -> Type {
+        Type::Route(RouteType::DeleteLink)
     }
 
     fn serialize(&self) -> Box<[u8]> {
