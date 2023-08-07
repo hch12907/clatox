@@ -2,10 +2,11 @@ use libc::*;
 
 use std::mem::{size_of, transmute};
 
-use crate::utils::{align_attribute_len, read_u16};
+use crate::attribute::RawAttributeIter;
+use crate::utils::{self, align_attribute_len};
 
-use super::{LinkInfo, AddressFamilySpecific};
 use super::stats::{InterfaceStats, InterfaceStats64};
+use super::{AddressFamilySpecific, LinkInfo};
 
 /// Those attributes are to be used with `InterfaceInfoMessage`s. They
 /// correspond to `IFLA_*` in libc.
@@ -207,144 +208,133 @@ pub enum InterfaceInfoAttribute {
 
 impl InterfaceInfoAttribute {
     pub fn serialize_into(&self, buffer: &mut Vec<u8>) {
-        let original_len = buffer.len();
-
-        // Push a length of zero into the buffer first
-        buffer.extend(0u16.to_be_bytes().into_iter());
-
-        // And then a type of zero second
-        buffer.extend(0u16.to_be_bytes().into_iter());
-
-        let attr_type;
-
-        match self {
+        utils::serialize_attribute_into(buffer, |buffer| match self {
             InterfaceInfoAttribute::Unspecified(unspec) => {
-                attr_type = IFLA_UNSPEC;
                 buffer.extend(unspec.iter().cloned());
+                IFLA_UNSPEC
             }
 
             InterfaceInfoAttribute::Address(addr) => {
-                attr_type = IFLA_ADDRESS;
                 buffer.extend(addr.iter().cloned());
+                IFLA_ADDRESS
             }
 
             InterfaceInfoAttribute::Broadcast(addr) => {
-                attr_type = IFLA_BROADCAST;
                 buffer.extend(addr.iter().cloned());
+                IFLA_BROADCAST
             }
 
             InterfaceInfoAttribute::MTU(mtu) => {
-                attr_type = IFLA_MTU;
                 buffer.extend(mtu.to_ne_bytes().into_iter());
+                IFLA_MTU
             }
 
             InterfaceInfoAttribute::Link(link) => {
-                attr_type = IFLA_LINK;
                 buffer.extend(link.to_ne_bytes().into_iter());
+                IFLA_LINK
             }
 
             InterfaceInfoAttribute::InterfaceName(name) => {
-                attr_type = IFLA_IFNAME;
                 buffer.extend(name.bytes());
                 buffer.push(0u8); // zero terminated string
+                IFLA_IFNAME
             }
 
             InterfaceInfoAttribute::QueueDiscipline(queue) => {
-                attr_type = IFLA_QDISC;
                 buffer.extend(queue.bytes());
                 buffer.push(0u8); // zero terminated string
+                IFLA_QDISC
             }
 
             InterfaceInfoAttribute::Stats(stats) => {
-                attr_type = IFLA_STATS;
                 // SAFETY: It is safe to transmute InterfaceStats into a byte array as
                 // the type does not contain any paddings.
                 let bytes = unsafe {
                     transmute::<InterfaceStats, [u8; size_of::<InterfaceStats>()]>(stats.clone())
                 };
                 buffer.extend(bytes.iter().cloned());
+                IFLA_STATS
             }
 
             InterfaceInfoAttribute::Cost(content) => {
-                attr_type = IFLA_COST;
                 buffer.extend(content.iter().cloned());
+                IFLA_COST
             }
 
             InterfaceInfoAttribute::Priority(content) => {
-                attr_type = IFLA_PRIORITY;
                 buffer.extend(content.iter().cloned());
+                IFLA_PRIORITY
             }
 
             InterfaceInfoAttribute::Master(content) => {
-                attr_type = IFLA_MASTER;
                 buffer.extend(content.iter().cloned());
+                IFLA_MASTER
             }
 
             InterfaceInfoAttribute::Wireless(content) => {
-                attr_type = IFLA_WIRELESS;
                 buffer.extend(content.iter().cloned());
+                IFLA_WIRELESS
             }
 
             InterfaceInfoAttribute::ProtocolInfo(content) => {
-                attr_type = IFLA_PROTINFO;
                 buffer.extend(content.iter().cloned());
+                IFLA_PROTINFO
             }
 
             InterfaceInfoAttribute::TxQueueLength(content) => {
-                attr_type = IFLA_TXQLEN;
                 buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_TXQLEN
             }
 
             InterfaceInfoAttribute::Map(content) => {
-                attr_type = IFLA_MAP;
                 buffer.extend(content.iter().cloned());
+                IFLA_MAP
             }
 
             InterfaceInfoAttribute::Weight(content) => {
-                attr_type = IFLA_WEIGHT;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_WEIGHT
             }
 
             InterfaceInfoAttribute::OperationalState(content) => {
-                attr_type = IFLA_OPERSTATE;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_OPERSTATE
             }
 
             InterfaceInfoAttribute::LinkMode(content) => {
-                attr_type = IFLA_LINKMODE;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_LINKMODE
             }
 
             InterfaceInfoAttribute::LinkInfo(infos) => {
-                attr_type = IFLA_LINKINFO;
                 for info in infos {
-                    info.serialize_in(buffer);
+                    info.serialize_into(buffer);
                 }
+                IFLA_LINKINFO
             }
 
             InterfaceInfoAttribute::NetNamespacePid(content) => {
-                attr_type = IFLA_NET_NS_PID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_NET_NS_PID
             }
 
             InterfaceInfoAttribute::InterfaceAlias(alias) => {
-                attr_type = IFLA_IFALIAS;
                 buffer.extend(alias.bytes());
                 buffer.push(0u8); // zero terminated string
+                IFLA_IFALIAS
             }
 
             InterfaceInfoAttribute::NumVf(content) => {
-                attr_type = IFLA_NUM_VF;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_NUM_VF
             }
 
             InterfaceInfoAttribute::VfInfoList(content) => {
-                attr_type = IFLA_VFINFO_LIST;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_VFINFO_LIST
             }
 
             InterfaceInfoAttribute::Stats64(stats) => {
-                attr_type = IFLA_STATS64;
                 // SAFETY: It is safe to transmute InterfaceStats64 into a byte array as
                 // the type does not contain any paddings.
                 let bytes = unsafe {
@@ -352,222 +342,209 @@ impl InterfaceInfoAttribute {
                         stats.clone(),
                     )
                 };
-                buffer.extend(bytes.iter().cloned())
+                buffer.extend(bytes.iter().cloned());
+                IFLA_STATS64
             }
 
             InterfaceInfoAttribute::VfPorts(content) => {
-                attr_type = IFLA_VF_PORTS;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_VF_PORTS
             }
 
             InterfaceInfoAttribute::PortSelf(content) => {
-                attr_type = IFLA_PORT_SELF;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PORT_SELF
             }
 
             InterfaceInfoAttribute::AddressFamilySpecific(specs) => {
-                attr_type = IFLA_AF_SPEC;
                 for spec in specs {
                     spec.serialize_in(buffer);
                 }
+                IFLA_AF_SPEC
             }
 
             InterfaceInfoAttribute::Group(content) => {
-                attr_type = IFLA_GROUP;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_GROUP
             }
 
             InterfaceInfoAttribute::NetNamespaceFd(content) => {
-                attr_type = IFLA_NET_NS_FD;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_NET_NS_FD
             }
 
             InterfaceInfoAttribute::ExtMask(content) => {
-                attr_type = IFLA_EXT_MASK;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_EXT_MASK
             }
 
             InterfaceInfoAttribute::Promiscuity(content) => {
-                attr_type = IFLA_PROMISCUITY;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_PROMISCUITY
             }
 
             InterfaceInfoAttribute::NumTxQueues(content) => {
-                attr_type = IFLA_NUM_TX_QUEUES;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_NUM_TX_QUEUES
             }
 
             InterfaceInfoAttribute::NumRxQueues(content) => {
-                attr_type = IFLA_NUM_RX_QUEUES;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_NUM_RX_QUEUES
             }
 
             InterfaceInfoAttribute::Carrier(content) => {
-                attr_type = IFLA_CARRIER;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_CARRIER
             }
 
             InterfaceInfoAttribute::PhysicalPortId(content) => {
-                attr_type = IFLA_PHYS_PORT_ID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PHYS_PORT_ID
             }
 
             InterfaceInfoAttribute::CarrierChanges(content) => {
-                attr_type = IFLA_CARRIER_CHANGES;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_CARRIER_CHANGES
             }
 
             InterfaceInfoAttribute::PhysicalSwitchId(content) => {
-                attr_type = IFLA_PHYS_SWITCH_ID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PHYS_SWITCH_ID
             }
 
             InterfaceInfoAttribute::LinkNetNamespaceId(content) => {
-                attr_type = IFLA_LINK_NETNSID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_LINK_NETNSID
             }
 
             InterfaceInfoAttribute::PhysicalPortName(content) => {
-                attr_type = IFLA_PHYS_PORT_NAME;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PHYS_PORT_NAME
             }
 
             InterfaceInfoAttribute::ProtocolDown(content) => {
-                attr_type = IFLA_PROTO_DOWN;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PROTO_DOWN
             }
 
             InterfaceInfoAttribute::GsoMaxSegments(content) => {
-                attr_type = IFLA_GSO_MAX_SEGS;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_GSO_MAX_SEGS
             }
 
             InterfaceInfoAttribute::GsoMaxSize(content) => {
-                attr_type = IFLA_GSO_MAX_SIZE;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_GSO_MAX_SIZE
             }
 
             InterfaceInfoAttribute::Pad(content) => {
-                attr_type = IFLA_PAD;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PAD
             }
 
             InterfaceInfoAttribute::Xdp(content) => {
-                attr_type = IFLA_XDP;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_XDP
             }
 
             InterfaceInfoAttribute::Event(content) => {
-                attr_type = IFLA_EVENT;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_EVENT
             }
 
             InterfaceInfoAttribute::NewNetNamespaceId(content) => {
-                attr_type = IFLA_NEW_NETNSID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_NEW_NETNSID
             }
 
             InterfaceInfoAttribute::InterfaceNetNamespaceId(content) => {
-                attr_type = IFLA_IF_NETNSID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_IF_NETNSID
             }
 
             InterfaceInfoAttribute::TargetNetNamespaceId(content) => {
-                attr_type = IFLA_TARGET_NETNSID;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_TARGET_NETNSID
             }
 
             InterfaceInfoAttribute::CarrierUpCount(content) => {
-                attr_type = IFLA_CARRIER_UP_COUNT;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_CARRIER_UP_COUNT
             }
 
             InterfaceInfoAttribute::CarrierDownCount(content) => {
-                attr_type = IFLA_CARRIER_DOWN_COUNT;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_CARRIER_DOWN_COUNT
             }
 
             InterfaceInfoAttribute::NewInterfaceIndex(content) => {
-                attr_type = IFLA_NEW_IFINDEX;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_NEW_IFINDEX
             }
 
             InterfaceInfoAttribute::MinMTU(content) => {
-                attr_type = IFLA_MIN_MTU;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_MIN_MTU
             }
 
             InterfaceInfoAttribute::MaxMTU(content) => {
-                attr_type = IFLA_MAX_MTU;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_MAX_MTU
             }
 
             InterfaceInfoAttribute::PropertiesList(content) => {
-                attr_type = IFLA_PROP_LIST;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PROP_LIST
             }
 
             InterfaceInfoAttribute::AlternativeName(content) => {
-                attr_type = IFLA_ALT_IFNAME;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_ALT_IFNAME
             }
 
             InterfaceInfoAttribute::PermanentAddress(content) => {
-                attr_type = IFLA_PERM_ADDRESS;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PERM_ADDRESS
             }
 
             InterfaceInfoAttribute::ProtocolDownReason(content) => {
-                attr_type = IFLA_PROTO_DOWN_REASON;
-                buffer.extend(content.iter().cloned())
+                buffer.extend(content.iter().cloned());
+                IFLA_PROTO_DOWN_REASON
             }
 
             InterfaceInfoAttribute::ParentDeviceName(content) => {
-                attr_type = IFLA_PARENT_DEV_NAME;
                 buffer.extend(content.bytes());
                 buffer.push(0u8); // zero-terminated string
+                IFLA_PARENT_DEV_NAME
             }
 
             InterfaceInfoAttribute::ParentDeviceBusName(content) => {
-                attr_type = IFLA_PARENT_DEV_BUS_NAME;
                 buffer.extend(content.bytes());
                 buffer.push(0u8); // zero-terminated string
+                IFLA_PARENT_DEV_BUS_NAME
             }
 
             InterfaceInfoAttribute::GroMaxSize(content) => {
-                attr_type = IFLA_GRO_MAX_SIZE;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_GRO_MAX_SIZE
             }
 
             InterfaceInfoAttribute::TsoMaxSize(content) => {
-                attr_type = IFLA_TSO_MAX_SIZE;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_TSO_MAX_SIZE
             }
 
             InterfaceInfoAttribute::TsoMaxSegments(content) => {
-                attr_type = IFLA_TSO_MAX_SEGS;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_TSO_MAX_SEGS
             }
 
             InterfaceInfoAttribute::AllMulti(content) => {
-                attr_type = IFLA_ALLMULTI;
-                buffer.extend(content.to_ne_bytes().into_iter())
+                buffer.extend(content.to_ne_bytes().into_iter());
+                IFLA_ALLMULTI
             }
-        };
-
-        for (i, byte) in (buffer.len() as u16).to_ne_bytes().into_iter().enumerate() {
-            buffer[i] = byte;
-        }
-
-        for (i, byte) in attr_type.to_ne_bytes().into_iter().enumerate() {
-            buffer[i + 2] = byte;
-        }
-
-        // Align the buffer to RTA_ALIGNTO bytes by filling in zeroes
-        let length = (buffer.len() - original_len) as i32;
-        for _ in 0..(align_attribute_len(length) - length) {
-            buffer.push(0u8);
-        }
+        });
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
@@ -577,23 +554,12 @@ impl InterfaceInfoAttribute {
     }
 
     pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
-        let mut iter = bytes.iter();
+        let mut iter = RawAttributeIter::new(bytes.iter().cloned());
+        let attr = iter.next()?;
 
-        let attr_len = read_u16(iter.by_ref().cloned()).unwrap();
-        let attr_type = read_u16(iter.by_ref().cloned()).unwrap();
-        let aligned_attr_len = align_attribute_len(attr_len as i32) as usize;
-        let mut content = iter
-            .by_ref()
-            .take(aligned_attr_len - 4)
-            .cloned()
-            .collect::<Vec<_>>();
-
-        // This will happen when there's an error.
-        if attr_len == 0 {
-            return None;
-        }
-
-        content.truncate(attr_len as usize - 4);
+        let attr_len = align_attribute_len(attr.length() as i32) as usize;
+        let attr_type = attr.attr_type();
+        let content = attr.into_payload();
 
         let attr = match attr_type {
             IFLA_UNSPEC => InterfaceInfoAttribute::Unspecified(content),
@@ -661,14 +627,14 @@ impl InterfaceInfoAttribute {
                 }
 
                 InterfaceInfoAttribute::LinkInfo(infos)
-            },
+            }
             IFLA_NET_NS_PID => InterfaceInfoAttribute::NetNamespacePid(content),
             IFLA_IFALIAS => {
                 let mut content = String::from_utf8(content).ok()?;
                 let zero = content.pop();
                 debug_assert!(zero == Some('\0'));
                 InterfaceInfoAttribute::InterfaceAlias(content)
-            },
+            }
             IFLA_NUM_VF => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::NumVf(u32::from_ne_bytes(content))
@@ -699,7 +665,7 @@ impl InterfaceInfoAttribute {
                 }
 
                 InterfaceInfoAttribute::AddressFamilySpecific(specs)
-            },
+            }
             IFLA_GROUP => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::Group(u32::from_ne_bytes(content))
@@ -798,6 +764,6 @@ impl InterfaceInfoAttribute {
             }
         };
 
-        Some((attr, aligned_attr_len))
+        Some((attr, attr_len))
     }
 }

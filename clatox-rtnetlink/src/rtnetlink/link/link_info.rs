@@ -1,6 +1,7 @@
 use libc::*;
 
-use crate::utils::{align_attribute_len, read_u16};
+use crate::attribute::RawAttributeIter;
+use crate::utils::{self, align_attribute_len};
 
 /// Information of a link interface. Corresponds to `IFLA_INFO_*` in libc.
 ///
@@ -27,16 +28,12 @@ pub enum LinkInfo {
 
 impl LinkInfo {
     pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
-        let mut iter = bytes.iter();
+        let mut iter = RawAttributeIter::new(bytes.iter().cloned());
+        let attr = iter.next()?;
 
-        let attr_len = read_u16(iter.by_ref().cloned()).unwrap();
-        let attr_type = read_u16(iter.by_ref().cloned()).unwrap();
-        let aligned_attr_len = align_attribute_len(attr_len as i32) as usize;
-        let content = iter
-            .by_ref()
-            .take(aligned_attr_len - 4)
-            .cloned()
-            .collect::<Vec<_>>();
+        let attr_len = align_attribute_len(attr.length() as i32) as usize;
+        let attr_type = attr.attr_type();
+        let content = attr.into_payload();
 
         let attr = match attr_type {
             IFLA_INFO_UNSPEC => LinkInfo::Unspecified(content),
@@ -48,58 +45,35 @@ impl LinkInfo {
             x @ _ => panic!("unknown LinkInfo type: {}", x),
         };
 
-        Some((attr, aligned_attr_len))
+        Some((attr, attr_len))
     }
 
-    pub fn serialize_in(&self, buffer: &mut Vec<u8>) {
-        let original_len = buffer.len();
-
-        // Push a length of zero into the buffer first
-        buffer.extend(0u16.to_be_bytes().into_iter());
-
-        // And then a type of zero second
-        buffer.extend(0u16.to_be_bytes().into_iter());
-
-        let attr_type: u16;
-
-        match self {
+    pub fn serialize_into(&self, buffer: &mut Vec<u8>) {
+        utils::serialize_attribute_into(buffer, |buffer| match self {
             Self::Unspecified(content) => {
-                attr_type = IFLA_INFO_UNSPEC;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_UNSPEC
             }
             Self::Kind(content) => {
-                attr_type = IFLA_INFO_KIND;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_KIND
             }
             Self::Data(content) => {
-                attr_type = IFLA_INFO_DATA;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_DATA
             }
             Self::ExtendedStats(content) => {
-                attr_type = IFLA_INFO_XSTATS;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_XSTATS
             }
             Self::SlaveKind(content) => {
-                attr_type = IFLA_INFO_SLAVE_KIND;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_SLAVE_KIND
             }
             Self::SlaveData(content) => {
-                attr_type = IFLA_INFO_SLAVE_DATA;
-                buffer.extend(content.iter())
+                buffer.extend(content.iter());
+                IFLA_INFO_SLAVE_DATA
             }
-        };
-
-        for (i, byte) in (buffer.len() as u16).to_ne_bytes().into_iter().enumerate() {
-            buffer[i] = byte;
-        }
-
-        for (i, byte) in attr_type.to_ne_bytes().into_iter().enumerate() {
-            buffer[i + 2] = byte;
-        }
-
-        let length = (buffer.len() - original_len) as i32;
-        for _ in 0..(align_attribute_len(length) - length) {
-            buffer.push(0u8);
-        }
+        });
     }
 }
