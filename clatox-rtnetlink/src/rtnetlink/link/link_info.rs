@@ -60,7 +60,7 @@ impl LinkInfo {
         // And then a type of zero second
         buffer.extend(0u16.to_be_bytes().into_iter());
 
-        let attr_type;
+        let attr_type: u16;
 
         match self {
             Self::Unspecified(content) => {

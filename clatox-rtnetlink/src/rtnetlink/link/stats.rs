@@ -1,4 +1,11 @@
+/// Statistics of an interface as collected by the system. 
+/// 
 /// The field names are taken verbatim from <linux/if_link.h>.
+/// 
+/// The C header also contains a fair amount of documentation on each field,
+/// the field themselves are pretty self-descriptive though.
+/// 
+/// TODO: Add some documentation to the fields here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(alias("rtnl_link_stats"))]
 #[repr(C)]
@@ -32,7 +39,14 @@ pub struct InterfaceStats {
     pub rx_nohandler: u32,
 }
 
+/// Statistics of an interface as collected by the system.
+/// 
 /// The 64-bit version of InterfaceStats.
+///
+/// The field names are taken verbatim from <linux/if_link.h>.
+/// 
+/// The C header also contains a fair amount of documentation on each field,
+/// the field themselves are pretty self-descriptive though.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(alias("rtnl_link_stats64"))]
 #[repr(C)]

@@ -1,9 +1,13 @@
+mod af_spec;
 mod attribute;
 mod device_type;
 mod flags;
 mod link_info;
 mod message;
 mod stats;
+
+#[doc(inline)]
+pub use af_spec::*;
 
 #[doc(inline)]
 pub use attribute::*;

@@ -4,7 +4,7 @@ use std::mem::{size_of, transmute};
 
 use crate::utils::{align_attribute_len, read_u16};
 
-use super::LinkInfo;
+use super::{LinkInfo, AddressFamilySpecific};
 use super::stats::{InterfaceStats, InterfaceStats64};
 
 /// Those attributes are to be used with `InterfaceInfoMessage`s. They
@@ -94,7 +94,7 @@ pub enum InterfaceInfoAttribute {
     PortSelf(Vec<u8>),
 
     /// `IFLA_AF_SPEC`
-    AddressFamilySpecific(Vec<u8>),
+    AddressFamilySpecific(Vec<AddressFamilySpecific>),
 
     /// `IFLA_GROUP`
     Group(u32),
@@ -365,9 +365,11 @@ impl InterfaceInfoAttribute {
                 buffer.extend(content.iter().cloned())
             }
 
-            InterfaceInfoAttribute::AddressFamilySpecific(content) => {
+            InterfaceInfoAttribute::AddressFamilySpecific(specs) => {
                 attr_type = IFLA_AF_SPEC;
-                buffer.extend(content.iter().cloned())
+                for spec in specs {
+                    spec.serialize_in(buffer);
+                }
             }
 
             InterfaceInfoAttribute::Group(content) => {
@@ -684,7 +686,20 @@ impl InterfaceInfoAttribute {
             }
             IFLA_VF_PORTS => Self::VfPorts(content),
             IFLA_PORT_SELF => Self::PortSelf(content),
-            IFLA_AF_SPEC => Self::AddressFamilySpecific(content),
+            IFLA_AF_SPEC => {
+                let mut iter = content.iter();
+                let mut remaining_len = content.len();
+                let mut specs = Vec::new();
+
+                while remaining_len > 0 {
+                    let (attr, len) = AddressFamilySpecific::deserialize(iter.as_slice())?;
+                    specs.push(attr);
+                    iter.nth(len - 1).unwrap();
+                    remaining_len -= len;
+                }
+
+                InterfaceInfoAttribute::AddressFamilySpecific(specs)
+            },
             IFLA_GROUP => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceInfoAttribute::Group(u32::from_ne_bytes(content))
