@@ -82,4 +82,3 @@ impl<I: Iterator<Item = u8>> Iterator for RawAttributeIter<I> {
         })
     }
 }
-

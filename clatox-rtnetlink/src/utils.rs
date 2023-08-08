@@ -45,16 +45,17 @@ where
 
     let attr_type = f(buffer);
 
-    for (i, byte) in (buffer.len() as u16).to_ne_bytes().into_iter().enumerate() {
-        buffer[i] = byte;
+    let length = buffer.len() - original_len;
+
+    for (i, byte) in (length as u16).to_ne_bytes().into_iter().enumerate() {
+        buffer[i + original_len] = byte;
     }
 
     for (i, byte) in attr_type.to_ne_bytes().into_iter().enumerate() {
-        buffer[i + 2] = byte;
+        buffer[i + original_len + 2] = byte;
     }
 
-    let length = (buffer.len() - original_len) as i32;
-    for _ in 0..(align_attribute_len(length) - length) {
+    for _ in 0..(align_attribute_len(length as i32) - length as i32) {
         buffer.push(0u8);
     }
 }

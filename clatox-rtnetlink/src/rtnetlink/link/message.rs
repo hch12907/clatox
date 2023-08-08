@@ -51,7 +51,7 @@ impl InterfaceInfoMessage {
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
-        let mut buffer = vec![0u8; 16];
+        let mut buffer = Vec::with_capacity(16);
         buffer.extend(self.family.to_ne_bytes().into_iter());
         buffer.extend(self.device_type.raw_value().to_ne_bytes().into_iter());
         buffer.extend(self.index.to_ne_bytes().into_iter());
