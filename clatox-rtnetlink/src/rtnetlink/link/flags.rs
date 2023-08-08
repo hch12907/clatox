@@ -121,7 +121,7 @@ impl InterfaceFlag {
     }
 }
 
-/// This is a bitfield consisting of multiple interfacee flags.
+/// This is a bitfield consisting of multiple interface flags.
 #[doc(alias("ifinfomsg", "ifi_flags", "IFF_"))]
 #[derive(Clone, Debug, Default, Copy, PartialEq, Eq)]
 pub struct InterfaceFlags {
