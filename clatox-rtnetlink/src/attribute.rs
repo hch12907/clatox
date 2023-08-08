@@ -1,6 +1,15 @@
 use crate::utils::{read_u16, align_attribute_len};
 
-/// A raw Netlink attribute.
+/// A trait implemented by all Netlink message attributes.
+pub trait Attribute: Sized {
+    fn from_raw(raw: RawAttribute) -> Option<Self>;
+
+    // Do we want this? Converting serialize_into() to to_raw() is not super
+    // straightforward unlike deserialize() and from_raw().
+    // fn to_raw(&self) -> RawAttribute;
+}
+
+/// A raw Netlink attribute consisting of length, type, and associated payload.
 #[repr(C)]
 pub struct RawAttribute {
     attr_len: u16,
@@ -65,7 +74,7 @@ impl<I: Iterator<Item = u8>> Iterator for RawAttributeIter<I> {
     type Item = RawAttribute;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let attr_len = read_u16(self.bytes.by_ref()).unwrap();
+        let attr_len = read_u16(self.bytes.by_ref())?;
         let attr_type = read_u16(self.bytes.by_ref()).unwrap();
         let aligned_attr_len = align_attribute_len(attr_len as i32) as usize;
         let mut payload = self.bytes

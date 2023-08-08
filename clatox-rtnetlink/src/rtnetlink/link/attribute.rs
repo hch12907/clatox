@@ -2,8 +2,8 @@ use libc::*;
 
 use std::mem::{size_of, transmute};
 
-use crate::attribute::RawAttributeIter;
-use crate::utils::{self, align_attribute_len};
+use crate::attribute::{RawAttributeIter, Attribute, RawAttribute};
+use crate::utils;
 
 use super::stats::{InterfaceStats, InterfaceStats64};
 use super::{AddressFamilySpecific, LinkInfo};
@@ -552,14 +552,12 @@ impl InterfaceInfoAttribute {
         self.serialize_into(&mut buffer);
         buffer.into_boxed_slice()
     }
+}
 
-    pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
-        let mut iter = RawAttributeIter::new(bytes.iter().cloned());
-        let attr = iter.next()?;
-
-        let attr_len = align_attribute_len(attr.length() as i32) as usize;
-        let attr_type = attr.attr_type();
-        let content = attr.into_payload();
+impl Attribute for InterfaceInfoAttribute {
+    fn from_raw(raw: RawAttribute) -> Option<Self> {
+        let attr_type = raw.attr_type();
+        let content = raw.into_payload();
 
         let attr = match attr_type {
             IFLA_UNSPEC => InterfaceInfoAttribute::Unspecified(content),
@@ -615,16 +613,9 @@ impl InterfaceInfoAttribute {
                 InterfaceInfoAttribute::LinkMode(*content)
             }
             IFLA_LINKINFO => {
-                let mut iter = content.iter();
-                let mut remaining_len = content.len();
-                let mut infos = Vec::new();
-
-                while remaining_len > 0 {
-                    let (attr, len) = LinkInfo::deserialize(iter.as_slice())?;
-                    infos.push(attr);
-                    iter.nth(len - 1).unwrap();
-                    remaining_len -= len;
-                }
+                let infos = RawAttributeIter::new(content.iter().cloned())
+                    .map(LinkInfo::from_raw)
+                    .try_collect()?;
 
                 InterfaceInfoAttribute::LinkInfo(infos)
             }
@@ -653,16 +644,9 @@ impl InterfaceInfoAttribute {
             IFLA_VF_PORTS => Self::VfPorts(content),
             IFLA_PORT_SELF => Self::PortSelf(content),
             IFLA_AF_SPEC => {
-                let mut iter = content.iter();
-                let mut remaining_len = content.len();
-                let mut specs = Vec::new();
-
-                while remaining_len > 0 {
-                    let (attr, len) = AddressFamilySpecific::deserialize(iter.as_slice())?;
-                    specs.push(attr);
-                    iter.nth(len - 1).unwrap();
-                    remaining_len -= len;
-                }
+                let specs = RawAttributeIter::new(content.iter().cloned())
+                    .map(AddressFamilySpecific::from_raw)
+                    .try_collect()?;
 
                 InterfaceInfoAttribute::AddressFamilySpecific(specs)
             }
@@ -764,6 +748,6 @@ impl InterfaceInfoAttribute {
             }
         };
 
-        Some((attr, attr_len))
+        Some(attr)
     }
 }

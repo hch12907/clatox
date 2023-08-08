@@ -1,7 +1,7 @@
 use libc::*;
 
-use crate::attribute::RawAttributeIter;
-use crate::utils::{self, align_attribute_len};
+use crate::attribute::{Attribute, RawAttribute};
+use crate::utils;
 
 /// Information of a link interface. Corresponds to `IFLA_INFO_*` in libc.
 ///
@@ -27,27 +27,6 @@ pub enum LinkInfo {
 }
 
 impl LinkInfo {
-    pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
-        let mut iter = RawAttributeIter::new(bytes.iter().cloned());
-        let attr = iter.next()?;
-
-        let attr_len = align_attribute_len(attr.length() as i32) as usize;
-        let attr_type = attr.attr_type();
-        let content = attr.into_payload();
-
-        let attr = match attr_type {
-            IFLA_INFO_UNSPEC => LinkInfo::Unspecified(content),
-            IFLA_INFO_KIND => LinkInfo::Kind(content),
-            IFLA_INFO_DATA => LinkInfo::Data(content),
-            IFLA_INFO_XSTATS => LinkInfo::ExtendedStats(content),
-            IFLA_INFO_SLAVE_KIND => LinkInfo::SlaveKind(content),
-            IFLA_INFO_SLAVE_DATA => LinkInfo::SlaveData(content),
-            x @ _ => panic!("unknown LinkInfo type: {}", x),
-        };
-
-        Some((attr, attr_len))
-    }
-
     pub fn serialize_into(&self, buffer: &mut Vec<u8>) {
         utils::serialize_attribute_into(buffer, |buffer| match self {
             Self::Unspecified(content) => {
@@ -75,5 +54,24 @@ impl LinkInfo {
                 IFLA_INFO_SLAVE_DATA
             }
         });
+    }
+}
+
+impl Attribute for LinkInfo {
+    fn from_raw(raw: RawAttribute) -> Option<Self> {
+        let attr_type = raw.attr_type();
+        let content = raw.into_payload();
+
+        let attr = match attr_type {
+            IFLA_INFO_UNSPEC => LinkInfo::Unspecified(content),
+            IFLA_INFO_KIND => LinkInfo::Kind(content),
+            IFLA_INFO_DATA => LinkInfo::Data(content),
+            IFLA_INFO_XSTATS => LinkInfo::ExtendedStats(content),
+            IFLA_INFO_SLAVE_KIND => LinkInfo::SlaveKind(content),
+            IFLA_INFO_SLAVE_DATA => LinkInfo::SlaveData(content),
+            x @ _ => panic!("unknown LinkInfo type: {}", x),
+        };
+
+        Some(attr)
     }
 }

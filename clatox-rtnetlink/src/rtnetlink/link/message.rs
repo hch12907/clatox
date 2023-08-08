@@ -1,5 +1,6 @@
 use libc::*;
 
+use crate::attribute::{RawAttributeIter, Attribute};
 use crate::netlink::{Payload, RouteType, Type};
 use crate::utils::{align_attribute_len, read_u16, read_u32};
 
@@ -95,20 +96,9 @@ impl InterfaceInfoMessage {
             iter.next()?;
         }
 
-        let mut attributes = Vec::new();
-
-        let mut remaining_len = bytes.len() - aligned_len as usize;
-        while remaining_len > 2 {
-            let bytes = iter.as_slice();
-            let (attr, len) = match InterfaceInfoAttribute::deserialize(bytes) {
-                Some(attr) => attr,
-                None => break,
-            };
-            attributes.push(attr);
-
-            iter.by_ref().nth(len - 1).unwrap();
-            remaining_len -= len;
-        }
+        let attributes = RawAttributeIter::new(iter.cloned())
+            .map(InterfaceInfoAttribute::from_raw)
+            .try_collect()?;
 
         Some(InterfaceInfoMessage {
             family,

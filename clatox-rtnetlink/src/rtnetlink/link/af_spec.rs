@@ -1,7 +1,7 @@
 use libc::*;
 
-use crate::attribute::RawAttributeIter;
-use crate::utils::{self, align_attribute_len};
+use crate::attribute::{Attribute, RawAttribute};
+use crate::utils;
 
 /// Address-family specific information of a link interface.
 ///
@@ -23,23 +23,6 @@ pub enum AddressFamilySpecific {
 }
 
 impl AddressFamilySpecific {
-    pub fn deserialize(bytes: &[u8]) -> Option<(Self, usize)> {
-        let mut iter = RawAttributeIter::new(bytes.iter().cloned());
-        let attr = iter.next()?;
-
-        let attr_len = align_attribute_len(attr.length() as i32) as usize;
-        let attr_type = attr.attr_type();
-        let content = attr.into_payload();
-
-        let attr = match attr_type as i32 {
-            AF_INET => AddressFamilySpecific::Inet(content),
-            AF_INET6 => AddressFamilySpecific::Inet6(content),
-            typ => AddressFamilySpecific::Other(typ as u8, content),
-        };
-
-        Some((attr, attr_len))
-    }
-
     pub fn serialize_in(&self, buffer: &mut Vec<u8>) {
         utils::serialize_attribute_into(buffer, |buffer| match self {
             Self::Inet(content) => {
@@ -55,5 +38,20 @@ impl AddressFamilySpecific {
                 *typ as u16
             }
         });
+    }
+}
+
+impl Attribute for AddressFamilySpecific {
+    fn from_raw(raw: RawAttribute) -> Option<Self> {
+        let attr_type = raw.attr_type();
+        let content = raw.into_payload();
+
+        let attr = match attr_type as i32 {
+            AF_INET => Self::Inet(content),
+            AF_INET6 => Self::Inet6(content),
+            typ => Self::Other(typ as u8, content),
+        };
+
+        Some(attr)
     }
 }
