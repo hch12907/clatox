@@ -1,5 +1,23 @@
+use std::net::IpAddr;
+
 use clatox_rtnetlink::netlink::*;
 use clatox_rtnetlink::rtnetlink::*;
+
+fn remove_line_with_brace(output: String) -> String {
+    output
+        .split('\n')
+        .filter(|x| !x.contains('{') && !x.contains('}'))
+        .fold(String::new(), |acc, x| acc + "\n" + x.strip_suffix(',').unwrap())
+}
+
+fn pretty_address(output: &[u8]) -> String {
+    match output.len() {
+        4 => IpAddr::from(<[u8; 4]>::try_from(output).unwrap()).to_string(),
+        6 => output.iter().map(|x| format!("{x:x}")).collect::<Vec<_>>().join(":"),
+        16 => IpAddr::from(<[u8; 16]>::try_from(output).unwrap()).to_string(),
+        _ => format!("{:?}", output),
+    }
+}
 
 fn show_link() {
     let mut socket = Socket::connect_to_kernel(Protocol::Route)
@@ -27,8 +45,8 @@ fn show_link() {
             use InterfaceInfoAttribute::*;
             match attr {
                 InterfaceName(name) => println!("  interface name: {}", name),
-                Address(addr) => println!("  interface address: {:?}", addr),
-                Broadcast(brd) => println!("  interface broadcast: {:?}", brd),
+                Address(addr) => println!("  interface address: {}", pretty_address(addr)),
+                Broadcast(brd) => println!("  interface broadcast: {}", pretty_address(brd)),
                 MTU(mtu) => println!("  interface MTU: {}", mtu),
                 MinMTU(mtu) => println!("  interface minimum MTU: {}", mtu),
                 MaxMTU(mtu) => println!("  interface maximum MTU: {}", mtu),
@@ -39,7 +57,8 @@ fn show_link() {
                 ParentDeviceName(name) => println!("  interface parent device name: {}", name),
                 ParentDeviceBusName(name) => println!("  interface parent device bus name: {}", name),
                 InterfaceAlias(name) => println!("  interface alias: {}", name),
-                Stats64(stats) => println!("  interface stats: {:#?}", stats),
+                Stats64(stats) =>
+                    println!("  interface stats: {}", remove_line_with_brace(format!("{:#?}", stats))),
                 _ => (),
             }
         }
@@ -74,7 +93,7 @@ fn show_addr() {
         Flags::new(&[Flag::Request, Flag::Dump]),
         // Since we are requesting Dump, the args below don't really matter
         GetAddress(InterfaceAddressMessage::new(
-            clatox_rtnetlink::rtnetlink::AddressFamily::Inet,
+            clatox_rtnetlink::rtnetlink::AddressFamily::Unspecified,
             0,
             AddressFlags::new(&[]),
             vec![]
@@ -91,10 +110,11 @@ fn show_addr() {
         for attr in content.attributes() {
             use InterfaceAddressAttribute::*;
             match attr {
-                Address(addr) => println!("  interface address: {:?}", addr),
-                Local(addr) => println!("  interface local address: {:?}", addr),
+                Address(addr) => println!("  interface address: {}", pretty_address(addr)),
+                Local(addr) => println!("  interface local address: {}", pretty_address(addr)),
                 Label(label) => println!("  interface label: {}", label),
-                CacheInfo(cache) => println!("  interface cache info: {:#?}", cache),
+                CacheInfo(cache) =>
+                    println!("  interface cache info: {}", remove_line_with_brace(format!("{:#?}", cache))),
                 Flags(f) => println!("  interface flags: {}", f),
                 _ => (),
             }
