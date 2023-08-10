@@ -5,7 +5,7 @@ use libc::*;
 use crate::netlink::{Attribute, RawAttribute};
 use crate::utils;
 
-use super::AddressCacheInfo;
+use super::{AddressCacheInfo, AddressFlags};
 
 pub const IFA_RT_PRIORITY: u16 = 9;
 pub const IFA_TARGET_NETNSID: u16 = 10;
@@ -39,7 +39,7 @@ pub enum InterfaceAddressAttribute {
     Multicast(Vec<u8>),
 
     /// `IFA_FLAGS`
-    Flags(u32),
+    Flags(AddressFlags),
 
     /// `IFA_RT_PRIORITY`
     RoutePriority(u32),
@@ -97,7 +97,7 @@ impl InterfaceAddressAttribute {
                 IFA_MULTICAST
             }
             InterfaceAddressAttribute::Flags(flag) => {
-                buffer.extend(flag.to_ne_bytes().iter());
+                buffer.extend(flag.bits().to_ne_bytes().iter());
                 IFA_FLAGS
             }
             InterfaceAddressAttribute::RoutePriority(priority) => {
@@ -150,7 +150,8 @@ impl Attribute for InterfaceAddressAttribute {
             IFA_MULTICAST => InterfaceAddressAttribute::Multicast(content),
             IFA_FLAGS => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
-                InterfaceAddressAttribute::Flags(u32::from_ne_bytes(content))
+                let flag = AddressFlags::from_bits_truncate(u32::from_ne_bytes(content));
+                InterfaceAddressAttribute::Flags(flag)
             }
             IFA_RT_PRIORITY => {
                 let content = <[u8; 4]>::try_from(content).ok()?;

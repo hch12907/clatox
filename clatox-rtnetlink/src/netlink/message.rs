@@ -174,7 +174,7 @@ impl<T: Payload> Message<T> {
         let pid = read_u32(iter.by_ref().cloned()).unwrap();
 
         let message_type = Type::from_raw_value(message_type)?;
-        let flags = unsafe { Flags::with_bits(flags) };
+        let flags = Flags::from_bits(flags)?;
 
         // The `()` "payload" means that we get only the headers.
         if !header_only && message_type != T::message_type() {

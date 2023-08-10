@@ -24,12 +24,12 @@ fn show_link() {
         .expect("unable to open netlink socket");
 
     let message = Message::new(
-        Flags::new(&[Flag::Request, Flag::Dump]),
+        Flags::Request | Flags::Dump,
         // Since we are requesting Dump, the args below don't really matter
         GetLink(InterfaceInfoMessage::new(
             ArpHardware::Ethernet,
             0,
-            InterfaceFlags::new(&[]),
+            InterfaceFlags::empty(),
             vec![]
         ))
     );
@@ -90,12 +90,12 @@ fn show_addr() {
         .expect("unable to open netlink socket");
 
     let message = Message::new(
-        Flags::new(&[Flag::Request, Flag::Dump]),
+        Flags::Request | Flags::Dump,
         // Since we are requesting Dump, the args below don't really matter
         GetAddress(InterfaceAddressMessage::new(
             clatox_rtnetlink::rtnetlink::AddressFamily::Unspecified,
             0,
-            AddressFlags::new(&[]),
+            AddressFlags::empty(),
             vec![]
         ))
     );
@@ -115,7 +115,7 @@ fn show_addr() {
                 Label(label) => println!("  interface label: {}", label),
                 CacheInfo(cache) =>
                     println!("  interface cache info: {}", remove_line_with_brace(format!("{:#?}", cache))),
-                Flags(f) => println!("  interface flags: {}", f),
+                Flags(f) => println!("  interface flags: {:?}", f),
                 _ => (),
             }
         }

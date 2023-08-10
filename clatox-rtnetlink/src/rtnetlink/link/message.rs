@@ -86,8 +86,7 @@ impl InterfaceInfoMessage {
         let change = read_u32(iter.by_ref().cloned()).unwrap();
 
         let device_type = ArpHardware::from_raw_value(device_type)?;
-        let flags = unsafe { InterfaceFlags::with_bits(flags) };
-
+        let flags = InterfaceFlags::from_bits(flags)?;
         // We have read 16 bytes so far. Align it to NLA_ALIGNTO bytes and start
         // deserializing the attributes.
         let aligned_len = align_attribute_len(16);
@@ -96,7 +95,12 @@ impl InterfaceInfoMessage {
         }
 
         let attributes = RawAttributeIter::new(iter.cloned())
-            .map(InterfaceInfoAttribute::from_raw)
+            .map(|a| {
+                let typ = a.attr_type();
+                let attr = InterfaceInfoAttribute::from_raw(a);
+                println!("{}, {:?}", typ, attr);
+                attr
+            })
             .try_collect()?;
 
         Some(InterfaceInfoMessage {

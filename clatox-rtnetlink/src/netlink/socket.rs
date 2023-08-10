@@ -4,7 +4,7 @@ use socket2::{Domain, Protocol as RawProtocol, SockAddr, Socket as RawSocket, Ty
 use std::io::{ErrorKind as IoErrorKind, IoSlice, IoSliceMut, Read, Result as IoResult, Write};
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
-use super::{Message, Payload, Protocol, Flag, types, ErrorMessage};
+use super::{Message, Payload, Protocol, Flags, types, ErrorMessage};
 
 /// This corresponds to an opened socket which is bound to a `SocketAddr`.
 /// Right now, `SocketAddr` is not implemented and `Socket` is hardcoded to
@@ -92,7 +92,7 @@ impl Socket {
             Some(header) => header,
             None => Err(IoErrorKind::InvalidInput)?,
         };
-        let is_multipart = first_header.flags().has_flag(Flag::Multi);
+        let is_multipart = first_header.flags().contains(Flags::Multi);
         let is_error = first_header.message_type() == types::Type::Error;
 
         if is_multipart {

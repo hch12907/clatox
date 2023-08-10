@@ -54,10 +54,27 @@ impl InterfaceAddressMessage {
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
+        let mut serialize_flag = None;
+
         let mut buffer = Vec::with_capacity(16);
         buffer.push(self.family.raw_value());
         buffer.push(self.prefixlen);
-        buffer.push(self.flags.bits());
+
+        // If we have way too many flags in our hands, ignore them, make a new
+        // attribute carrying the flags instead
+        if self.flags.bits() <= u8::MAX as u32 {
+            buffer.push(self.flags.bits() as u8);
+        } else {
+            let has_flags = self
+                .attributes
+                .iter()
+                .position(|a| matches!(a, InterfaceAddressAttribute::Flags(_)))
+                .is_some();
+
+            if !has_flags {
+                serialize_flag = Some(self.flags);
+            }
+        }
         buffer.push(self.scope);
         buffer.extend(self.index.to_ne_bytes().into_iter());
 
@@ -68,6 +85,11 @@ impl InterfaceAddressMessage {
 
         for attr in &self.attributes {
             attr.serialize_into(&mut buffer)
+        }
+
+        if let Some(flag) = serialize_flag {
+            let attr = InterfaceAddressAttribute::Flags(flag);
+            attr.serialize_into(&mut buffer);
         }
 
         buffer.into_boxed_slice()
@@ -89,7 +111,7 @@ impl InterfaceAddressMessage {
         let index = read_u32(iter.by_ref()).unwrap();
 
         let family = AddressFamily::from_raw_value(family)?;
-        let flags = unsafe { AddressFlags::with_bits(flags) };
+        let flags = AddressFlags::from_bits(flags as u32)?;
 
         // We have read 8 bytes so far. Align it to NLA_ALIGNTO bytes and start
         // deserializing the attributes.
