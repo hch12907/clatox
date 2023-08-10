@@ -1,7 +1,6 @@
 use libc::*;
 
 use crate::netlink::{Attribute, RawAttribute};
-use crate::rtnetlink::AddressFamily;
 use crate::utils;
 
 /// Address-family specific information of a link interface.
@@ -20,7 +19,7 @@ pub enum AddressFamilySpecific {
     Inet6(Vec<u8>),
 
     /// Unrecognized address families
-    Other(AddressFamily, Vec<u8>),
+    Other(u8, Vec<u8>),
 }
 
 impl AddressFamilySpecific {
@@ -50,7 +49,7 @@ impl Attribute for AddressFamilySpecific {
         let attr = match attr_type as i32 {
             AF_INET => Self::Inet(content),
             AF_INET6 => Self::Inet6(content),
-            typ => Self::Other(AddressFamily::from_raw_value(typ as u8)?, content),
+            typ => Self::Other(typ as u8, content),
         };
 
         Some(attr)
