@@ -1,6 +1,6 @@
 use libc::*;
 
-use crate::attribute::{Attribute, RawAttribute};
+use crate::netlink::{Attribute, RawAttribute};
 use crate::utils;
 
 /// Address-family specific information of a link interface.

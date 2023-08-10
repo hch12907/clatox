@@ -1,6 +1,6 @@
 use libc::*;
 
-use crate::attribute::{Attribute, RawAttribute};
+use crate::netlink::{Attribute, RawAttribute};
 use crate::utils;
 
 /// Information of a link interface. Corresponds to `IFLA_INFO_*` in libc.

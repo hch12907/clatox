@@ -1,8 +1,9 @@
-use std::mem::{transmute, size_of};
+use std::mem::{size_of, transmute};
 
 use libc::*;
 
-use crate::{utils, Attribute, RawAttribute};
+use crate::netlink::{Attribute, RawAttribute};
+use crate::utils;
 
 use super::AddressCacheInfo;
 
@@ -82,7 +83,7 @@ impl InterfaceAddressAttribute {
             }
             InterfaceAddressAttribute::CacheInfo(cache) => {
                 // SAFETY: It is safe to transmute CacheInfo into a byte array as
-                // the type does not contain any paddings. 
+                // the type does not contain any paddings.
                 let bytes = unsafe {
                     transmute::<AddressCacheInfo, [u8; size_of::<AddressCacheInfo>()]>(
                         cache.clone(),
@@ -94,27 +95,27 @@ impl InterfaceAddressAttribute {
             InterfaceAddressAttribute::Multicast(content) => {
                 buffer.extend(content.iter());
                 IFA_MULTICAST
-            },
+            }
             InterfaceAddressAttribute::Flags(flag) => {
                 buffer.extend(flag.to_ne_bytes().iter());
                 IFA_FLAGS
-            },
+            }
             InterfaceAddressAttribute::RoutePriority(priority) => {
                 buffer.extend(priority.to_ne_bytes().iter());
                 IFA_RT_PRIORITY
-            },
+            }
             InterfaceAddressAttribute::TargetNetNamespaceId(content) => {
                 buffer.extend(content.iter());
                 IFA_TARGET_NETNSID
-            },
+            }
             InterfaceAddressAttribute::Protocol(prot) => {
                 buffer.push(*prot);
                 IFA_PROTO
-            },
+            }
             InterfaceAddressAttribute::Other(typ, content) => {
                 buffer.extend(content.iter());
                 *typ
-            },
+            }
         })
     }
 }
@@ -133,7 +134,7 @@ impl Attribute for InterfaceAddressAttribute {
                 let popped = content.pop();
                 debug_assert!(popped == Some('\0'));
                 InterfaceAddressAttribute::Label(content)
-            },
+            }
             IFA_BROADCAST => InterfaceAddressAttribute::Broadcast(content),
             IFA_ANYCAST => InterfaceAddressAttribute::Anycast(content),
             IFA_CACHEINFO => {
@@ -145,21 +146,21 @@ impl Attribute for InterfaceAddressAttribute {
                     transmute::<[u8; size_of::<AddressCacheInfo>()], AddressCacheInfo>(content)
                 };
                 InterfaceAddressAttribute::CacheInfo(cache)
-            },
+            }
             IFA_MULTICAST => InterfaceAddressAttribute::Multicast(content),
             IFA_FLAGS => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceAddressAttribute::Flags(u32::from_ne_bytes(content))
-            },
+            }
             IFA_RT_PRIORITY => {
                 let content = <[u8; 4]>::try_from(content).ok()?;
                 InterfaceAddressAttribute::RoutePriority(u32::from_ne_bytes(content))
-            },
+            }
             IFA_TARGET_NETNSID => InterfaceAddressAttribute::TargetNetNamespaceId(content),
             IFA_PROTO => {
                 let content = *content.get(0)?;
                 InterfaceAddressAttribute::Protocol(content)
-            },
+            }
             typ => InterfaceAddressAttribute::Other(typ, content),
         };
 

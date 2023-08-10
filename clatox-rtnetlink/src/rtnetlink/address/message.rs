@@ -1,9 +1,9 @@
 use libc::*;
 
-use crate::netlink::{Payload, Type, RouteType};
+use crate::netlink::{Attribute, RawAttributeIter};
+use crate::netlink::{Payload, RouteType, Type};
 use crate::rtnetlink::AddressFamily;
 use crate::utils::{align_attribute_len, read_u32};
-use crate::{Attribute, RawAttributeIter};
 
 use super::{AddressFlags, InterfaceAddressAttribute};
 

@@ -1,8 +1,12 @@
+mod attribute;
 mod flag;
 mod message;
 mod protocol;
 mod socket;
 mod types;
+
+#[doc(inline)]
+pub use self::attribute::*;
 
 #[doc(inline)]
 pub use self::flag::*;

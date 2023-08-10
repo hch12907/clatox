@@ -2,7 +2,7 @@ use libc::*;
 
 use std::mem::{size_of, transmute};
 
-use crate::attribute::{RawAttributeIter, Attribute, RawAttribute};
+use crate::netlink::{Attribute, RawAttribute, RawAttributeIter};
 use crate::utils;
 
 use super::stats::{InterfaceStats, InterfaceStats64};

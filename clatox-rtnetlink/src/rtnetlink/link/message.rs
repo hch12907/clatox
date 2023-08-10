@@ -1,7 +1,6 @@
 use libc::*;
 
-use crate::attribute::{RawAttributeIter, Attribute};
-use crate::netlink::{Payload, RouteType, Type};
+use crate::netlink::{Attribute, Payload, RawAttributeIter, RouteType, Type};
 use crate::utils::{align_attribute_len, read_u16, read_u32};
 
 use super::{ArpHardware, InterfaceFlags, InterfaceInfoAttribute};
