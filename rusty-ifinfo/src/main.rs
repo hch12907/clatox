@@ -2,6 +2,7 @@ use std::net::IpAddr;
 
 use clatox_rtnetlink::netlink::*;
 use clatox_rtnetlink::rtnetlink::*;
+use clatox_rtnetlink::rtnetlink::RouteType;
 
 fn remove_line_with_brace(output: String) -> String {
     output
@@ -93,7 +94,7 @@ fn show_addr() {
         Flags::Request | Flags::Dump,
         // Since we are requesting Dump, the args below don't really matter
         GetAddress(InterfaceAddressMessage::new(
-            clatox_rtnetlink::rtnetlink::AddressFamily::Unspecified,
+            AddressFamily::Unspecified,
             0,
             AddressFlags::empty(),
             vec![]
@@ -142,6 +143,71 @@ fn show_addr() {
     }
 }
 
+fn show_route() {
+    let mut socket = Socket::connect_to_kernel(Protocol::Route)
+        .expect("unable to open netlink socket");
+
+    let message = Message::new(
+        Flags::Request | Flags::Dump,
+        // Since we are requesting Dump, the args below don't really matter
+        GetRoute(RouteMessage::new(
+            AddressFamily::Unspecified,
+            0,
+            0,
+            0,
+            RouteTable::Default,
+            RouteProtocol::Unspecified,
+            RouteScope::Host,
+            RouteType::Unspecified,
+            RouteFlags::empty(),
+            vec![],
+        ))
+    );
+
+    socket.send_message(&message)
+        .expect("unable to send netlink message");
+
+    let received = socket.receive_message::<NewRoute>()
+        .expect("unable to receive a netlink message");
+
+    let print_a_payload = |content: &RouteMessage| {
+        println!("  route installer: {:?}", content.protocol());
+        println!("  route destination prefix len: {:?}", content.dst_len());
+        println!("  route source prefix len: {:?}", content.src_len());
+
+        for attr in content.attributes() {
+            use RouteAttribute::*;
+            match attr {
+                Destination(addr) => println!("  route destination: {}", pretty_address(addr)),
+                Source(addr) => println!("  route source: {}", pretty_address(addr)),
+                IncomingInterface(iif) => println!("  route incoming interface: {}", iif),
+                OutgoingInterface(oif) => println!("  route outgoing interface: {}", oif),
+                Gateway(addr) => println!("  route gateway: {}", pretty_address(addr)),
+                Metrics(met) =>  println!("  route metrics: {}", met),
+                _ => (),
+            }
+        }
+        println!();
+    };
+
+    if let ReceivedMessage::Multipart(messages) = received {
+        println!("netlink returned a multipart message:");
+
+        for message in messages {
+            let content = message.payload();
+            print_a_payload(&content.0);
+        }
+    } else if let ReceivedMessage::Message(message) = received {
+        println!("netlink returned a message:");
+
+        let content = message.payload();
+        print_a_payload(&content.0);
+    } else if let ReceivedMessage::Error(err) = received {
+        println!("netlink returned an error message:");
+        println!("{:?}", err);
+    }
+}
+
 fn main() {
     println!("Printing info dumped with RTM_GETLINK\n=====================================");
     show_link();
@@ -150,4 +216,8 @@ fn main() {
 
     println!("Printing info dumped with RTM_GETADDR\n=====================================");
     show_addr();
+
+    println!("");
+    println!("Printing info dumped with RTM_GETROUTE\n=====================================");
+    show_route();
 }
