@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 
-[dependencies.clatox-rtnetlink]
-path = "../clatox-rtnetlink"
+[dependencies.clatox-netlink]
+path = "../clatox-netlink"
 version = "0.1.0"

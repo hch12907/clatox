@@ -2,7 +2,7 @@
 
 A very simple tool that shows various information of network interfaces in a
 Linux system. This is **not** meant for production use, it is merely created
-to test the `clatox-rtnetlink` crate.
+to test the `clatox-netlink` crate.
 
 ## Building
 Just clone the repo and run `cargo build` in the directory this README is located

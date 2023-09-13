@@ -9,7 +9,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "630be753d4e58660abd17930c71b647fe46c27ea6b63cc59e1e3851406972e42"
 
 [[package]]
-name = "clatox-rtnetlink"
+name = "clatox-netlink"
 version = "0.1.0"
 dependencies = [
  "bitflags",
@@ -27,7 +27,7 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 name = "rusty-ifinfo"
 version = "0.1.0"
 dependencies = [
- "clatox-rtnetlink",
+ "clatox-netlink",
 ]
 
 [[package]]

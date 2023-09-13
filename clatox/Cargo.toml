@@ -9,6 +9,6 @@ edition = "2021"
 caps = "0.5.5"
 nix = "0.26.2"
 
-[dependencies.clatox-rtnetlink]
-path = "../clatox-rtnetlink"
+[dependencies.clatox-netlink]
+path = "../clatox-netlink"
 version = "0.1.0"

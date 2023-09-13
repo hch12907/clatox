@@ -1,8 +1,8 @@
 use std::net::IpAddr;
 
-use clatox_rtnetlink::netlink::*;
-use clatox_rtnetlink::rtnetlink::*;
-use clatox_rtnetlink::rtnetlink::RouteType;
+use clatox_netlink::netlink::*;
+use clatox_netlink::rtnetlink::*;
+use clatox_netlink::rtnetlink::RouteType;
 
 fn remove_line_with_brace(output: String) -> String {
     output
