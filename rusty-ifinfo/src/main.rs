@@ -2,7 +2,6 @@ use std::net::IpAddr;
 
 use clatox_netlink::netlink::*;
 use clatox_netlink::rtnetlink::*;
-use clatox_netlink::rtnetlink::RouteType;
 
 fn remove_line_with_brace(output: String) -> String {
     output
@@ -24,15 +23,13 @@ fn show_link() {
     let mut socket = Socket::connect_to_kernel(Protocol::Route)
         .expect("unable to open netlink socket");
 
-    let message = Message::new(
-        Flags::Request | Flags::Dump,
-        // Since we are requesting Dump, the args below don't really matter
-        GetLink(InterfaceInfoMessage::new(
-            ArpHardware::Ethernet,
-            0,
-            InterfaceFlags::empty(),
-            vec![]
-        ))
+    let mut message = NetlinkMessage::new(
+        NetlinkHeader:: {
+            flags: NLM_F_DUMP | NLM_F_REQUEST,
+            sequence_number: 1,
+            ..Default::default(),
+        },
+        RtnlMessage::GetLink(LinkMesssage::default()).into(),
     );
 
     socket.send_message(&message)

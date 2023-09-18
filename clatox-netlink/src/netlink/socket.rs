@@ -1,10 +1,13 @@
 use libc::*;
+use netlink_packet_utils::Parseable;
 use socket2::{Domain, Protocol as RawProtocol, SockAddr, Socket as RawSocket, Type};
 
 use std::io::{ErrorKind as IoErrorKind, IoSlice, IoSliceMut, Read, Result as IoResult, Write};
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
-use super::{Message, Payload, Protocol, Flags, types, ErrorMessage};
+use super::Protocol;
+
+use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkMessage, NetlinkBuffer, ErrorMessage, NetlinkPayload, NetlinkSerializable};
 
 /// This corresponds to an opened socket which is bound to a `SocketAddr`.
 /// Right now, `SocketAddr` is not implemented and `Socket` is hardcoded to
@@ -19,17 +22,17 @@ pub struct Socket {
 pub enum ReceivedMessage<T> {
     /// A Netlink error message was received. The original Netlink header is
     /// provided to give user applications a clue which message was erroneous.
-    Error(Message<ErrorMessage>),
+    Error(ErrorMessage),
 
     /// A Netlink message was successfully received.
-    Message(Message<T>),
+    Message(T),
 
     /// Multiple fragmented (multipart) Netlink messages were received.
     /// It is generally not expected for multipart messages to be reassembled
     /// together in Netlink. The exact behaviour that is expected upon receiving
     /// multipart messages depends on the Netlink protocol that is in use. Some
     /// protocols expect them to be treated like separate messages.
-    Multipart(Vec<Message<T>>),
+    Multipart(Vec<T>),
 }
 
 impl Socket {
@@ -70,10 +73,11 @@ impl Socket {
 
     pub fn receive_message<T>(&mut self) -> IoResult<ReceivedMessage<T>>
     where
-        T: Payload + std::fmt::Debug,
+        T: NetlinkDeserializable,
     {
         let recv_buffer_size = self.socket.recv_buffer_size()?;
         let mut buffer = vec![0u8; recv_buffer_size];
+
         let size = self.socket.read(buffer.as_mut_slice())?;
 
         if size == 0 {
@@ -88,38 +92,40 @@ impl Socket {
             buffer.set_len(size);
         }
 
-        let first_header = match Message::<()>::deserialize(&buffer[..size]) {
-            Some(header) => header,
-            None => Err(IoErrorKind::InvalidInput)?,
-        };
-        let is_multipart = first_header.flags().contains(Flags::Multi);
-        let is_error = first_header.message_type() == types::Type::Error;
+        let nl_buffer = NetlinkBuffer::new(&buffer);
+        let first_header = NetlinkHeader::parse(&nl_buffer)
+            .map_err(|_| IoErrorKind::InvalidData)?;
+
+        let is_multipart = (first_header.flags & NLM_F_MULTI as u16) > 0;
 
         if is_multipart {
             let mut messages = Vec::new();
             let mut header = first_header;
 
-            while header.message_type() != types::Type::Done {
+            while header.message_type != NLMSG_DONE as u16 {
                 let mut last_used_buffer = 0;
                 let mut used_buffer = 0;
 
                 while used_buffer < buffer.len() {
-                    used_buffer += header.length() as usize;
+                    used_buffer += header.length as usize;
 
                     let current_buf = &buffer[last_used_buffer..used_buffer];
                     let next_buf = &buffer[used_buffer..];
 
-                    let message = match Message::<T>::deserialize(current_buf) {
-                        Some(msg) => msg,
-                        None => Err(IoErrorKind::InvalidInput)?,
+                    let message = match T::deserialize(&header, current_buf) {
+                        Ok(msg) => msg,
+                        // TODO: proper error message
+                        Err(e) => Err(IoErrorKind::InvalidInput)?,
                     };
 
                     messages.push(message);
 
-                    header = match Message::<()>::deserialize(next_buf) {
-                        Some(header) => header,
-                        None if used_buffer < buffer.len() => Err(IoErrorKind::InvalidInput)?,
-                        None => break,
+                    let next_nl_buffer = NetlinkBuffer::new(next_buf);
+
+                    header = match NetlinkHeader::parse(&next_nl_buffer) {
+                        Ok(header) => header,
+                        Err(e) if used_buffer < buffer.len() => Err(IoErrorKind::InvalidInput)?,
+                        Err(_) => break,
                     };
 
                     last_used_buffer = used_buffer;
@@ -132,32 +138,35 @@ impl Socket {
                     let size = self.socket.read(buffer.as_mut_slice())?;
                     buffer.set_len(size);
 
-                    header = match Message::<()>::deserialize(&buffer) {
-                        Some(header) => header,
-                        None => Err(IoErrorKind::InvalidInput)?,
+                    let nl_buffer = NetlinkBuffer::new(&buffer);
+
+                    header = match NetlinkHeader::parse(&nl_buffer) {
+                        Ok(header) => header,
+                        Err(e) => Err(IoErrorKind::InvalidInput)?,
                     };
                 }
             }
 
             Ok(ReceivedMessage::Multipart(messages))
-        } else if is_error {
-            match Message::<ErrorMessage>::deserialize(&buffer[..size]) {
-                Some(msg) => Ok(ReceivedMessage::Error(msg)),
-                None => Err(IoErrorKind::InvalidInput)?,
-            }
         } else {
-            match Message::<T>::deserialize(&buffer[..size]) {
-                Some(msg) => Ok(ReceivedMessage::Message(msg)),
-                None => Err(IoErrorKind::InvalidInput)?,
+            match NetlinkMessage::parse(&nl_buffer) {
+                Ok(msg) => match msg.payload {
+                    NetlinkPayload::InnerMessage(msg) => Ok(ReceivedMessage::Message(msg)),
+                    NetlinkPayload::Error(err) => Ok(ReceivedMessage::Error(err)),
+                    _ => panic!("got unknown payload"),
+                },
+                Err(e) => Err(IoErrorKind::InvalidInput)?,
             }
         }
     }
 
-    pub fn send_message<T>(&mut self, msg: &Message<T>) -> IoResult<usize>
+    pub fn send_message<T>(&mut self, msg: &NetlinkMessage<T>) -> IoResult<usize>
     where
-        T: Payload,
+        T: NetlinkSerializable,
     {
-        self.socket.write(msg.serialize().as_ref())
+        let mut buf = vec![0u8; msg.buffer_len()];
+        msg.serialize(&mut buf);
+        self.socket.write(&buf)
     }
 }
 
